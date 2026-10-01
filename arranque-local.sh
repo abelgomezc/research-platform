@@ -57,7 +57,10 @@ docker compose build
 # ---------------------------------------------------------------------
 log "Levantando servicios"
 # ---------------------------------------------------------------------
-docker compose --profile with-ollama up -d
+# No se activa el perfil with-ollama a proposito: se usa el Ollama del host, que
+# es donde estan los modelos. El servicio de Ollama del compose ocuparia el
+# mismo 11434 y no veria los modelos del host.
+docker compose up -d
 
 # ---------------------------------------------------------------------
 log "Esperando a que el backend este listo"

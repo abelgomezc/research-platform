@@ -15,6 +15,10 @@ agentes con roles, herramientas registradas, presupuestos y verificacion.
 > ninguna cifra real de calidad de informe, coste por investigacion ni tasa de
 > verificacion. La seccion *Resultados* mas abajo lo dice explicitamente en lugar de
 > inventar numeros. Para cerrarla hace falta levantar Docker y correr el dataset.
+>
+> "Implementado" significa que el codigo existe y esta cubierto por tests
+> unitarios, **no que se haya ejecutado de principio a fin**. Lo que falta esta
+> enumerated en *Limitaciones conocidas*.
 
 ## Arquitectura
 
@@ -55,8 +59,18 @@ cp .env.example .env       # Linux/macOS
 arranque-local.bat         # Windows
 ```
 
-Un solo comando levanta PostgreSQL con pgvector, SearXNG, Ollama, backend y frontend.
+Un solo comando levanta PostgreSQL con pgvector, SearXNG, backend y frontend.
 Las migraciones de Flyway se aplican automaticamente al arrancar el backend.
+
+> **Aviso: `DB_PASSWORD` tiene que coincidir en los dos sitios.** Docker Compose
+> crea el Postgres con el valor de `.env`, pero el backend lee su contrasena de la
+> variable de entorno `DB_PASSWORD`, con default `research` en
+> `application.properties`. Si en `.env` dejas otro valor, el backend arranca y
+> falla al conectar. Si lo cambias, exporta tambien la variable antes de lanzarlo.
+
+Los modelos se descargan en el **Ollama del host**, no en el del compose. Por eso
+`.env` trae `OLLAMA_BASE_URL_INTERNAL=http://host.docker.internal:11434`: el
+backend corre en Docker y necesita alcanzar el Ollama del host por esa ruta.
 
 | Servicio | URL |
 |---|---|
@@ -66,21 +80,52 @@ Las migraciones de Flyway se aplican automaticamente al arrancar el backend.
 | Health | http://localhost:8081/actuator/health |
 | Metricas | http://localhost:8081/actuator/metrics |
 
-### Desarrollo fuera de Docker
+### Montaje hibrido: Docker solo para PostgreSQL y SearXNG
+
+Es la opcion recomendada si ya tienes Ollama corriendo en el host. Solo la base de
+datos y el metabuscador van en Docker; el backend y el frontend corren nativos.
+
+| Componente | Donde | Puerto |
+|---|---|---|
+| PostgreSQL + pgvector | Docker | 5433 |
+| SearXNG | Docker | 8090 |
+| Ollama | nativo (host) | 11434 |
+| Backend | nativo | 8081 |
+| Frontend | nativo | 5174 |
 
 ```bash
-cd backend
-mvn spring-boot:run
-```
-
-Necesitas un PostgreSQL 16 con pgvector y un Ollama con los modelos descargados:
-
-```bash
+# 1. Solo estos dos servicios. No uses `docker compose up -d` a secas:
+#    el backend y el frontend tambien se construirian en Docker.
 docker compose up -d postgres searxng
-docker compose --profile with-ollama up -d ollama
+
+# 2. Modelos en el Ollama del host
 ollama pull qwen3:8b
 ollama pull nomic-embed-text
+
+# 3. Backend nativo
+cd backend && mvn spring-boot:run
+
+# 4. Frontend nativo (otra terminal)
+cd frontend && npm install && npm run dev
 ```
+
+En este modo el `.env` solo lo lee Docker Compose. El backend nativo usa los
+defaults de `application.properties`, que ya apuntan a `localhost:5433` y
+`localhost:11434`, asi que **no hay que exportar ninguna variable**.
+
+El frontend nativo hace proxy de `/api` a `localhost:8081` (ver `vite.config.ts`),
+por lo que no hay que configurar CORS para desarrollo.
+
+#### Si ya tienes PostgreSQL nativo
+
+El proyecto espera `5433` porque el `5432` queda reservado para LocalRAG. Con
+Docker, el mapeo `5433:5432` ya resuelve el conflicto. Si en tu maquina hay un
+PostgreSQL nativo como el de LocalRAG, sigue funcionando: los dos conviven en
+puertos distintos.
+
+Lo que **no** es opcional es pgvector. El instalador nativo de PostgreSQL para
+Windows no lo incluye, y sin el operador `<=>` la migracion `V1` falla al aplicar.
+Por eso Postgres va en Docker aunque el resto no vaya.
 
 ## Comandos utiles
 
@@ -98,7 +143,7 @@ cd backend && mvn -DskipTests package
 docker compose logs -f backend
 
 # Detener todo
-docker compose --profile with-ollama down
+docker compose down
 ```
 
 ## Configuracion
@@ -122,8 +167,11 @@ app.llm.embedding-model=nomic-embed-text
 
 Tambien por variable de entorno: `LLM_MODEL_PLANNER`, `LLM_MODEL_RESEARCHER`, etc.
 
-**Requisito:** el modelo de chat debe soportar tool calling en Ollama. `qwen3:8b`
-lo soporta.
+**No hay requisito de tool calling nativo.** El agente no usa la capacidad de tool
+calling del proveedor: el protocolo es **JSON en el texto** (`ToolCall`), porque
+Ollama via Spring AI no lo expone de forma fiable. Cualquier modelo de chat que
+responda siguiendo instrucciones sirve. Ver `agents/ResearchAgent` y la seccion
+`agents/` de [AGENTS.md](AGENTS.md).
 
 ### Adaptador de LocalRAG (opcional)
 
@@ -208,6 +256,52 @@ Para que ambos proyectos convivan en la misma máquina:
 | SearXNG (host) | 8090 | — |
 | Ollama | 11434 (compartido) | 11434 (compartido) |
 
+## Limitaciones conocidas
+
+Estado honesto de lo que no esta terminado. Ninguna de estas cosas se ha
+verificado en ejecucion: el sistema completo **nunca se ha arrancado**.
+
+### Frontend
+
+Es funcional pero es una interfaz de prototipo, no un producto acabado:
+
+- **Los enlaces de cita del informe no funcionan.** `MarkdownInforme.tsx` genera
+  anclas `#evidencia-N` y no existe ningun elemento con ese `id`. Apuntar a otro
+  sitio o quitar el enlace, pero hoy toda cita lleva a un ancla inexistente.
+- **No hay ErrorBoundary.** Cualquier error en render deja la pantalla en blanco
+  en lugar de mostrar un mensaje.
+- **No hay accesibilidad basica**: sin `aria-*`, sin `role`, sin estados de foco
+  visibles. Navegar por teclado es adivinar.
+- **Carga sin estados intermedios**: solo un texto "Cargando...". Sin skeletons.
+- **Sin responsive real**: solo `flex-wrap`. No hay breakpoints ni vista movil.
+- **El sondeo del detalle es fijo cada 5 s** (`DetalleInvestigacion.tsx`) y no se
+  pausa cuando la pestana esta oculta.
+- `react-router-dom` esta declarado como dependencia pero no se usa: la navegacion
+  es con estado de React, sin URLs, sin deep-link ni boton atras del navegador.
+
+### Prompts
+
+`AGENTS.md` establece que los prompts viven en
+`backend/src/main/resources/prompts/<agente>-v<N>.st`. **Ese directorio no existe
+todavia**: los seis prompts estan como cadenas dentro del Java. El versionado si
+existe y se registra (`VERSION_PROMPT` en cada agente), pero el texto no se movio
+a ficheros.
+
+### Rendimiento
+
+Con `qwen3:8b` (5.2 GB) en una GPU de 6 GB y `num-ctx=8192` (~2.4 GB de KV cache),
+el modelo no cabe en VRAM y desborda a RAM por CPU. El arranque y la ingesta son
+rapidos; las llamadas a los agentes son lentas, y una investigacion son 6 roles
+por hasta 12 pasos por hasta 3 rondas. Si el problema es de velocidad, la palanca
+es `spring.ai.ollama.chat.options.num-ctx`, no el modelo.
+
+### Integracion
+
+- `mvn test` pasa (199 tests) **sin Docker**: son unitarios con dobles.
+- `mvn verify` (Testcontainers) **nunca se ha ejecutado**.
+- Nunca se ha corrido una investigacion real de principio a fin, ni se ha medido
+  la calidad del informe. De ahi que la seccion *Resultados* no tenga cifras.
+
 ## API de investigaciones
 
 | Endpoint | Que hace |
@@ -249,7 +343,11 @@ asi:
 
 ```bash
 # 1. Levantar la infraestructura y el backend
+#    Requiere que .env tenga OLLAMA_BASE_URL_INTERNAL apuntando al Ollama
+#    del host. Con el valor por defecto de .env.example ya funciona.
 docker compose up -d --build
+#    Si prefieres el montaje hibrido, levanta solo postgres y searxng en
+#    Docker y arranca el backend nativo: ver "Montaje hibrido" mas arriba.
 
 # 2. Ejecutar el dataset de evaluacion (5 casos, cada uno una investigacion)
 curl -X POST "http://localhost:8081/api/evaluation/run" \

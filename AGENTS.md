@@ -42,6 +42,11 @@ Documentacion: [README.md](README.md). Estado de avance: seccion inferior.
 
 - Los prompts viven en `backend/src/main/resources/prompts/<agente>-v<N>.st`.
 - Cada ejecucion registra el **nombre y la version del prompt** usado y el modelo.
+- **Pendiente:** el directorio `resources/prompts/` todavia no existe. Los seis
+  prompts estan como cadenas dentro de las clases de agente. El versionado si
+  existe y se registra (`VERSION_PROMPT`), pero mover el texto a ficheros es
+  trabajo pendiente. Al hacerlo, cambia la version: es un cambio de prompt, y el
+  versionado existe justo para poder distinguirlo de una correccion de codigo.
 
 ### Modelos
 

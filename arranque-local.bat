@@ -52,7 +52,10 @@ if errorlevel 1 exit /b 1
 
 echo.
 echo ==^> Levantando servicios
-docker compose --profile with-ollama up -d
+REM No se activa el perfil with-ollama a proposito: se usa el Ollama del host,
+REM que es donde estan los modelos. El servicio de Ollama del compose
+REM ocuparia el mismo 11434 y no veria los modelos del host.
+docker compose up -d
 if errorlevel 1 exit /b 1
 
 echo.
@@ -75,7 +78,7 @@ echo ==^> Estado
 curl -s "http://localhost:8081/actuator/health"
 echo.
 echo.
-echo   Frontend:  http://localhost:5173
+echo   Frontend:  http://localhost:5174
 echo   API:       http://localhost:8081
 echo   OpenAPI:   http://localhost:8081/swagger-ui.html
 echo   Health:    http://localhost:8081/actuator/health
