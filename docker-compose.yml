@@ -1,0 +1,114 @@
+# =====================================================================
+# AI Research & Intelligence Platform - servicios locales
+# Un solo comando levanta todo: docker compose up -d
+# =====================================================================
+
+name: research-platform
+
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: research-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-research_platform}
+      POSTGRES_USER: ${DB_USER:-research}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-research}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-research} -d ${DB_NAME:-research_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - research
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: research-searxng
+    environment:
+      SEARXNG_BASE_URL: "http://localhost:${SEARXNG_PORT:-8081}/"
+      SEARXNG_SETTINGS_PATH: /etc/searxng/settings.yml
+    ports:
+      - "${SEARXNG_PORT:-8081}:8080"
+    volumes:
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - research
+
+  # Servicio opcional. Para usar el Ollama del host, comenta este bloque
+  # y deja OLLAMA_BASE_URL apuntando a http://host.docker.internal:11434
+  ollama:
+    image: ollama/ollama:latest
+    container_name: research-ollama
+    profiles:
+      - with-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - research
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: research-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-research_platform}
+      DB_USER: ${DB_USER:-research}
+      DB_PASSWORD: ${DB_PASSWORD:-research}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_INTERNAL:-http://ollama:11434}
+      OLLAMA_PULL_STRATEGY: ${OLLAMA_PULL_STRATEGY:-never}
+      SEARXNG_URL: http://searxng:8080
+      API_TOKEN: ${API_TOKEN:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      LLM_MODEL_PLANNER: ${LLM_MODEL_PLANNER:-qwen3:8b}
+      LLM_MODEL_RESEARCHER: ${LLM_MODEL_RESEARCHER:-qwen3:8b}
+      LLM_MODEL_VERIFIER: ${LLM_MODEL_VERIFIER:-qwen3:8b}
+      LLM_MODEL_SYNTHESIZER: ${LLM_MODEL_SYNTHESIZER:-qwen3:8b}
+      LLM_MODEL_REVIEWER: ${LLM_MODEL_REVIEWER:-qwen3:8b}
+      LLM_EMBEDDING_MODEL: ${LLM_EMBEDDING_MODEL:-nomic-embed-text}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - research
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: research-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    networks:
+      - research
+
+volumes:
+  postgres-data:
+  ollama-data:
+
+networks:
+  research:
+    driver: bridge

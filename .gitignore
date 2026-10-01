@@ -1,0 +1,29 @@
+# Entorno
+.env
+.env.local
+*.local
+
+# Java / Maven
+target/
+*.class
+*.jar
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node
+node_modules/
+dist/
+.vite/
+coverage/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.iws
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,24 @@
+use_default_settings: true
+
+server:
+  port: 8080
+  limiter: false
+  image_proxy: false
+  bind_address: "0.0.0.0"
+
+search:
+  # Motor por defecto. Sin API keys.
+  default_lang: "es"
+  formats:
+    - html
+  safe_search: 1
+  autocomplete: ""
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 10.0
+  pool_connections: 20
+  pool_maxsize: 10
+
+# La API JSON se habilita solo para este proyecto local (sin claves).
+limiter: false

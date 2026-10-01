@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend (build, test, package)
+    runs-on: ubuntu-latest
+
+    services:
+      # Docker esta disponible en los runners de GitHub Actions, asi que
+      # Testcontainers levanta su propio contenedor sin configuracion extra.
+      docker:
+        image: docker:27-dind
+        options: --privileged
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Cache de Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Tests unitarios
+        run: mvn -B test
+
+      - name: Tests de integracion (Testcontainers + pgvector)
+        run: mvn -B verify -DskipTests=false
+
+      - name: Empaquetado
+        run: mvn -B -DskipTests package
+
+      - name: Publicar artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-platform-backend
+          path: backend/target/*.jar
+          retention-days: 14
