@@ -60,6 +60,18 @@ puerto tambien es lo que hace testeable el agente sin Levantar un indice vectori
 texto, documento, referencia y puntaje. LocalRAG debe exponer un endpoint que solo
 busque y devuelva fragmentos, sin generar respuesta con el LLM.
 
+**Estado verificado (Fase 2).** Revisado el codigo de LocalRAG sin modificarlo: **el
+endpoint no existe**. Solo hay POST /api/chat (invoca el LLM, no devuelve texto de
+fragmento ni puntaje) y GET /api/documents/{id}/content (documento completo, sin
+fragmentar). El metodo hybridSearch es privado y esta acoplado a sk(), que ademas
+reescribe la consulta con el LLM y guarda historial.
+
+Por eso el adaptador se implementa contra el contrato documentado y falla de forma
+controlada con un mensaje explicito. Se verifico contra un servidor HTTP simulado, no
+contra LocalRAG real. La alternativa de degradar a /api/chat se descarto: generaria
+tokens desde dos proyectos a la vez y, sin texto de fragmento, el agente no podria
+extraer la cita textual que sostiene todo el sistema.
+
 ---
 
 ## D4. Limites como parte del diseno, no como validacion posterior

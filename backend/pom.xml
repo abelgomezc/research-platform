@@ -104,6 +104,12 @@
             <version>1.21.2</version>
         </dependency>
 
+        <!-- Extraccion de texto de PDF para la ingesta de documentos -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pdf-document-reader</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

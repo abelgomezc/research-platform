@@ -6,9 +6,10 @@ y produce un informe donde **cada afirmacion cita su evidencia verificada**.
 No es un chatbot. Es un flujo de trabajo con maquina de estados explicita,
 agentes con roles, herramientas registradas, presupuestos y verificacion.
 
-> **Estado: FASE 1 completada.** Base del proyecto, configuracion por rol de agente,
-> wrapper del LLM con conteo de tokens y reintentos, esquema PostgreSQL + pgvector,
-> health checks y CI. Las fases siguientes anaden el flujo de investigacion.
+> **Estado: FASES 1 y 2 completadas.** Base del proyecto, wrapper del LLM con conteo de
+> tokens y reintentos, esquema PostgreSQL + pgvector, health checks, CI, puerto de
+> conocimiento con dos implementaciones y corpus de demostracion. Las fases siguientes
+> anaden el flujo de investigacion.
 
 ## Arquitectura
 
@@ -54,11 +55,11 @@ Las migraciones de Flyway se aplican automaticamente al arrancar el backend.
 
 | Servicio | URL |
 |---|---|
-| Frontend | http://localhost:5173 |
-| API | http://localhost:8080 |
-| OpenAPI (Swagger) | http://localhost:8080/swagger-ui.html |
-| Health | http://localhost:8080/actuator/health |
-| Metricas | http://localhost:8080/actuator/metrics |
+| Frontend | http://localhost:5174 |
+| API | http://localhost:8081 |
+| OpenAPI (Swagger) | http://localhost:8081/swagger-ui.html |
+| Health | http://localhost:8081/actuator/health |
+| Metricas | http://localhost:8081/actuator/metrics |
 
 ### Desarrollo fuera de Docker
 
@@ -119,15 +120,88 @@ Tambien por variable de entorno: `LLM_MODEL_PLANNER`, `LLM_MODEL_RESEARCHER`, et
 **Requisito:** el modelo de chat debe soportar tool calling en Ollama. `qwen3:8b`
 lo soporta.
 
-### Adaptador de LocalRAG (opcional, Fase 2)
+### Adaptador de LocalRAG (opcional)
 
-El conocimiento interno tiene dos implementaciones intercambiables Selected por
-`knowledge.provider`. El agente no sabe cual esta activa.
+El conocimiento interno tiene dos implementaciones intercambiables, seleccionadas
+por `app.knowledge.provider`. **El agente no sabe cuál está activa**: depende de la
+interfaz `KnowledgeSearchPort`, no de una implementación.
 
 - `knowledge.provider=pgvector` (por defecto, incluido en este repositorio)
-- `knowledge.provider=localrag` (adaptador HTTP, se implementa en la Fase 2)
+- `knowledge.provider=localrag` (adaptador HTTP)
 
-Las instrucciones de activacion se documentaran al cerrar la Fase 2.
+Para activarlo:
+
+```properties
+app.knowledge.provider=localrag
+app.knowledge.localrag.base-url=http://localhost:8080
+app.knowledge.localrag.search-path=/api/search
+```
+
+```bash
+KNOWLEDGE_PROVIDER=localrag LOCALRAG_URL=http://host.docker.internal:8080 docker compose up -d
+```
+
+#### Estado real del adaptador: verificado, no operativo
+
+El adaptador está **implementado y verificado contra el contrato**, pero
+**LocalRAG todavía no expone el endpoint que necesita**. Por eso falla de forma
+controlada en lugar de fingir que funciona.
+
+**Contrato esperado** (documentado en `LocalRagSearchItem`):
+
+```
+GET /api/search?query=...&topK=...
+```
+
+Devuelve una lista de:
+
+```json
+[
+  {"documentId": "doc-1", "fileName": "03-machine-learning.md", "pageNumber": null,
+   "chunkNumber": 2, "text": "El modelo cubre patrones que las reglas no catalogan.",
+   "score": 0.91}
+]
+```
+
+Solo recuperación: **sin LLM, sin reescritura de consulta, sin historial.**
+
+**Por qué no funciona todavía.** Revisando LocalRAG sin modificarlo, sus únicos
+endpoints son:
+
+| Endpoint | Por qué no sirve |
+|---|---|
+| `POST /api/chat` | Invoca el LLM y genera respuesta. No devuelve texto de fragmento ni puntaje. |
+| `GET /api/documents/{id}/content` | Devuelve el documento completo, sin fragmentar y sin puntaje. |
+| `GET /api/health` | Solo salud. |
+
+El método de búsqueda de LocalRAG (`RagQueryService.hybridSearch`) es **privado** y
+está acoplado a `ask()`, que antes de buscar reescribe la consulta con el LLM,
+evalúa calidad CRAG, genera con Self-RAG y guarda historial. No es recuperación pura.
+
+**Consecuencia práctica:** sin texto de fragmento el agente no puede extraer la
+cita textual, que es el núcleo de este proyecto. Por eso el puerto exige ambos.
+
+**Al activar el proveedor:** el health indicator queda en `DOWN` con el motivo
+explícito, y cada búsqueda lanza un error controlado que la tool convertirá en un
+mensaje entendible para el agente. **El proveedor por defecto sigue siendo
+pgvector.**
+
+> El adaptador está probado contra un **servidor HTTP simulado** que reproduce el
+> contrato (`FakeLocalRagServer`), no contra LocalRAG real, porque el endpoint no
+> existe. La clase de prueba seguirá siendo válida sin cambios cuando LocalRAG lo
+> exponga.
+
+### Puertos y convivencia con LocalRAG
+
+Para que ambos proyectos convivan en la misma máquina:
+
+| Servicio | Este proyecto | LocalRAG |
+|---|---|---|
+| Backend | 8081 | 8080 |
+| Frontend | 5174 | 5173 |
+| PostgreSQL (host) | 5433 | 5432 |
+| SearXNG (host) | 8090 | — |
+| Ollama | 11434 (compartido) | 11434 (compartido) |
 
 ## Documentacion
 

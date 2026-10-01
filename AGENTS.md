@@ -128,7 +128,7 @@ no `maxTokens`, para limitar la generacion.
 | Fase | Alcance | Estado |
 |---|---|---|
 | 1 | Base, config por rol, wrapper LLM, esquema, health, CI | Completada |
-| 2 | `KnowledgeSearchPort`, ingesta pgvector, corpus, adaptador LocalRAG | Pendiente |
+| 2 | `KnowledgeSearchPort`, ingesta pgvector, corpus, adaptador LocalRAG | Completada |
 | 3 | `ToolRegistry` y tools | Pendiente |
 | 4 | Research Manager, estado, plan | Pendiente |
 | 5 | Research Agent y tool calling | Pendiente |
@@ -138,3 +138,29 @@ no `maxTokens`, para limitar la generacion.
 | 9 | Frontend React | Pendiente |
 | 10 | Evaluacion y metricas | Pendiente |
 | 11 | Pulido final, README con resultados reales | Pendiente |
+
+## Notas por modulo
+
+### `knowledge/` (Fase 2)
+
+- El agente depende **solo** de `KnowledgeSearchPort`. Nunca de un adaptador.
+- Anadir una tercera implementacion es crear un adaptador y registrarlo en
+  `KnowledgeConfig`; no se toca el agente.
+- `TextChunker` mantiene solape a proposito: sin el, una cita que cae en el
+  limite entre fragmentos no apareceria completa en ninguno y la verificacion
+  determinista de la Fase 6 la rechazaria.
+- `DocumentChunkRepository` usa `JdbcTemplate` y SQL explicito, no el VectorStore
+  de Spring AI. La distancia coseno y el limite deben quedar visibles.
+- La migracion `V1` fija `vector(768)`, la dimension de `nomic-embed-text`. Cambiar
+  de modelo de embeddings exige una migracion nueva, no editar V1.
+- **LocalRAG no expone `GET /api/search`.** El adaptador esta verificado contra un
+  servidor HTTP simulado (`FakeLocalRagServer`). No inventes endpoints ni degrades
+  a `POST /api/chat`, que invoca el LLM. **No modifiques LocalRAG.**
+
+### `llm/` (Fase 1)
+
+- El unico punto de contacto con Spring AI es `SpringAiLlmGateway`.
+- Los agentes reciben `LlmResult`, nunca `ChatResponse`.
+- `tokensEstimated=true` significa que el proveedor no midio el uso. No lo
+  trates como un cero real.
+

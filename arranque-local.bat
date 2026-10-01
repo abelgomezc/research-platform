@@ -58,7 +58,7 @@ if errorlevel 1 exit /b 1
 echo.
 echo ==^> Esperando a que el backend este listo
 for /l %%I in (1,1,60) do (
-    curl -sf "http://localhost:8080/actuator/health" >nul 2>&1
+    curl -sf "http://localhost:8081/actuator/health" >nul 2>&1
     if not errorlevel 1 (
         echo     Backend respondiendo
         goto :listo
@@ -72,12 +72,12 @@ exit /b 1
 :listo
 echo.
 echo ==^> Estado
-curl -s "http://localhost:8080/actuator/health"
+curl -s "http://localhost:8081/actuator/health"
 echo.
 echo.
 echo   Frontend:  http://localhost:5173
-echo   API:       http://localhost:8080
-echo   OpenAPI:   http://localhost:8080/swagger-ui.html
-echo   Health:    http://localhost:8080/actuator/health
+echo   API:       http://localhost:8081
+echo   OpenAPI:   http://localhost:8081/swagger-ui.html
+echo   Health:    http://localhost:8081/actuator/health
 echo.
 endlocal

@@ -63,7 +63,7 @@ docker compose --profile with-ollama up -d
 log "Esperando a que el backend este listo"
 # ---------------------------------------------------------------------
 for intento in $(seq 1 60); do
-    if curl -sf "http://localhost:${BACKEND_PORT:-8080}/actuator/health" >/dev/null 2>&1; then
+    if curl -sf "http://localhost:${BACKEND_PORT:-8081}/actuator/health" >/dev/null 2>&1; then
         ok "Backend respondiendo"
         break
     fi
@@ -76,11 +76,11 @@ done
 # ---------------------------------------------------------------------
 log "Estado"
 # ---------------------------------------------------------------------
-curl -s "http://localhost:${BACKEND_PORT:-8080}/actuator/health" | head -c 400
+curl -s "http://localhost:${BACKEND_PORT:-8081}/actuator/health" | head -c 400
 echo
 echo
-echo "  Frontend:  http://localhost:${FRONTEND_PORT:-5173}"
-echo "  API:       http://localhost:${BACKEND_PORT:-8080}"
-echo "  OpenAPI:   http://localhost:${BACKEND_PORT:-8080}/swagger-ui.html"
-echo "  Health:    http://localhost:${BACKEND_PORT:-8080}/actuator/health"
+echo "  Frontend:  http://localhost:${FRONTEND_PORT:-5174}"
+echo "  API:       http://localhost:${BACKEND_PORT:-8081}"
+echo "  OpenAPI:   http://localhost:${BACKEND_PORT:-8081}/swagger-ui.html"
+echo "  Health:    http://localhost:${BACKEND_PORT:-8081}/actuator/health"
 echo
