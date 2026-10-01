@@ -79,6 +79,11 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-research_platform}
       DB_USER: ${DB_USER:-research}
       DB_PASSWORD: ${DB_PASSWORD:-research}
+      # Pool de solo lectura de la tool query_database. La URL se deriva de
+      # DB_URL para que apunte al PostgreSQL de esta red y no al de LocalRAG.
+      DB_RO_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-research_platform}
+      DB_RO_USER: ${DB_RO_USER:-research_ro}
+      DB_RO_PASSWORD: ${DB_RO_PASSWORD:-solo_lectura_demo}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_INTERNAL:-http://ollama:11434}
       OLLAMA_PULL_STRATEGY: ${OLLAMA_PULL_STRATEGY:-never}
       SEARXNG_URL: http://searxng:8080

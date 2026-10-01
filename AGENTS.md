@@ -129,15 +129,15 @@ no `maxTokens`, para limitar la generacion.
 |---|---|---|
 | 1 | Base, config por rol, wrapper LLM, esquema, health, CI | Completada |
 | 2 | `KnowledgeSearchPort`, ingesta pgvector, corpus, adaptador LocalRAG | Completada |
-| 3 | `ToolRegistry` y tools | Pendiente |
-| 4 | Research Manager, estado, plan | Pendiente |
-| 5 | Research Agent y tool calling | Pendiente |
-| 6 | Verificacion de dos capas, iteracion, presupuestos | Pendiente |
-| 7 | Sintesis, informe, Reviewer | Pendiente |
-| 8 | Checkpoints, reanudacion, cancelacion, SSE | Pendiente |
-| 9 | Frontend React | Pendiente |
-| 10 | Evaluacion y metricas | Pendiente |
-| 11 | Pulido final, README con resultados reales | Pendiente |
+| 3 | `ToolRegistry` y tools | Completada |
+| 4 | Research Manager, estado, plan | Completada |
+| 5 | Research Agent y tool calling | Completada |
+| 6 | Verificacion de dos capas, iteracion, presupuestos | Completada |
+| 7 | Sintesis, informe, Reviewer | Completada |
+| 8 | Checkpoints, reanudacion, cancelacion, SSE | Completada |
+| 9 | Frontend React | Completada |
+| 10 | Evaluacion y metricas | Completada |
+| 11 | Pulido final, README con resultados reales | Pendiente de medir |
 
 ## Notas por modulo
 
@@ -156,6 +156,110 @@ no `maxTokens`, para limitar la generacion.
 - **LocalRAG no expone `GET /api/search`.** El adaptador esta verificado contra un
   servidor HTTP simulado (`FakeLocalRagServer`). No inventes endpoints ni degrades
   a `POST /api/chat`, que invoca el LLM. **No modifiques LocalRAG.**
+
+### `tools/` (Fase 3)
+
+- Los permisos por rol se declaran en `ToolPermissionsConfig`, **nunca** en el
+  prompt. Si estuvieran en el prompt, un texto externo podria pedirle al modelo
+  una tool que no le corresponde y bastaria con que cooperara.
+- `save_evidence` inserta **siempre** en `estado_verificacion = 'PENDIENTE'`.
+  El agente no verifica su propia evidencia: si pudiera marcarla como
+  verificada, la verificacion de la Fase 6 seria una decoracion.
+- `query_database` corre con el pool `readOnlyDataSource` (usuario `research_ro`,
+  solo `GRANT SELECT`). El validador reduce superficie, no la sustituye. No la
+  cambies por el `JdbcTemplate` principal: perderias la garantia de que esa tool
+  no escribe.
+- `fetch_page` valida la URL **resolviendo DNS y comprobando todas las
+  direcciones**. Un host con un A publico y un AAAA a loopback es un bypass real
+  de los validadores que solo miran el texto de la URL.
+- `mark_task_complete` cierra la tarea de `ToolContext.tareaId()`, no la que el
+  modelo indique: el agente no elige que tarea cierra.
+- `create_research_task` tiene tope de tareas nuevas por ronda. Sin el, un
+  agente podria inflar el plan hasta agotar el presupuesto, que es una decision
+  del sistema y no del modelo.
+- El texto de `search_web` y `fetch_page` va delimitado como
+  `CONTENIDO EXTERNO NO VERIFICADO`. Es la frontera que impide que una pagina
+  inyecte instrucciones.
+- `ToolResult` con `exitoso=false` **no** es una excepcion: el agente recibe un
+  mensaje entendible y decide. Ningun fallo de tool tumba la investigacion.
+- `ReadOnlyDataSourceConfig` declara el pool de solo lectura **sin** `@Primary`
+  a proposito: el resto de la aplicacion sigue usando el pool con escritura.
+
+### `research/` (Fases 4, 7, 8)
+
+- **El LLM no cambia el estado.** `ResearchManager.transicionar` es el unico
+  punto, y relee el estado antes de validar contra `ResearchStateMachine`. Si
+  el llamador dijera el estado de origen, la maquina no serviria para nada.
+- `INTERRUPTED` **no es terminal** a proposito: una investigacion interrumpida se
+  reanuda. Si fuera terminal, el repositorio escribiria `finalizado_en` al
+  interrumpirse y la fecha de fin no seria la real.
+- El presupuesto se descuenta con `UPDATE ... WHERE tokens_consumidos + ? <=
+  presupuesto_tokens`. Es atomico a proposito: leer-modificar-escribir permitiria
+  que dos tareas en paralelo gastaran el mismo saldo.
+- El margen de seguridad se comprueba **antes** de la llamada, no despues. El
+  total de tokens solo se conoce cuando la llamada ya termino.
+- Un informe que no supera la revision deja la investigacion en `INTERRUPTED`, no
+  en `COMPLETED`. Marcar exito cuando el Reviewer rechazo es el fallo mas grave
+  posible del sistema.
+- La cancelacion es **cooperativa**: se comprueba entre tareas y entre fases,
+  nunca en mitad de una. Interrumpir una tool a medias podria dejar evidencia
+  guardada sin cerrar.
+- `ResearchEventStreamService` usa **hilos dedicados por stream**, no un hilo por
+  evento. Y consulta el estado en `investigaciones`, no los eventos, para saber
+  si termino.
+
+### `agents/` (Fases 5)
+
+- **No hay tool calling nativo.** `chatWithTools` delega en `chat`, asi que el
+  protocolo es JSON en el texto (`ToolCall`). Es una decision, no una carencia:
+  Ollama via Spring AI no expone tool calling fiable, y con un protocolo
+  declarado el bucle se prueba con un gateway falso.
+- `ToolCall` busca el primer objeto JSON **balanceado** en la respuesta. Exigir
+  que la respuesta sea exactamente un JSON hace fallar llamadas que eran validas.
+- El bucle tiene tres topes que impone el codigo: pasos maximos, presupuesto por
+  paso y cierre obligatorio. Un agente sin cierre perderia su trabajo.
+- `save_evidence` no se permite al Verifier: si el verificador pudiera crear su
+  propia evidencia, la verificacion seria una decoracion.
+
+### `evidence/` (Fases 6)
+
+- La verificacion es en **dos capas y en este orden**: primero determinista
+  (`CitationMatcher`), despues semantica (el Verifier). Al reves, una cita
+  inventada pasaria si el modelo se equivoca.
+- Una cita que no aparece en la fuente **no llega a consultar al modelo**. El test
+  lo comprueba con `verifyNoInteractions`.
+- La comprobacion determinista tiene cuatro modos: `EXACTA`, `SIN_ESPACIOS`,
+  `INVERTIDA` y `TOLERANTE`. La tolerante compara **por posicion**, no como
+  conjunto de caracteres: reordenar las palabras es otra cita.
+- Sin veredicto del modelo, una cita confirmada queda `PARCIAL`, nunca
+  `VERIFICADA`. Aprobar por defecto convertiria al verificador en una
+  formalidad.
+- `CitationMatcher.normalizar` es publico porque `evaluation/` necesita la misma
+  normalizacion. Si cada modulo normalizara por su cuenta, la metrica dependeria
+  de una convencion invisible.
+
+### `report/` (Fase 7)
+
+- `ReportValidator` es la **red de seguridad** del sintetizador. La garantia de
+  que el informe cita no puede depender de que el modelo obedezca.
+- Solo `VERIFICADA` puede sostener una afirmacion del informe. El sintetizador
+  recibe la evidencia ya filtrada para no citar algo que se sostiene mal.
+- Declarar un limite **no necesita cita**. Sin esa excepcion, el modelo tendria
+  que inventar una fuente para cerrar sus propios huecos.
+- `totalCitas` cuenta **referencias**, no marcadores: `[evidencias 1, 2]` son dos
+  citas, y para la metrica de evaluacion eso es lo que importa.
+
+### `evaluation/` (Fase 10)
+
+- **Ningun numero se inventa.** Si un dato no se puede calcular se devuelve
+  `null`, no `0`. Cero es un valor real con significado distinto.
+- La puntuacion es **cobertura de criterios esperados**, no parecido textual. Dos
+  redacciones distintas del mismo hecho son ambas correctas.
+- Se mide tambien si el criterio aparece **citado**. Un dato sin cita no es una
+  respuesta valida en este sistema.
+- La media solo cuenta casos **ejecutados**: un caso fallido tiene 0 por
+  construccion y mezclarla haria que el numero no describiera nada.
+- Un caso sin criterios esperados no se puntua: su 0 no significaria nada.
 
 ### `llm/` (Fase 1)
 

@@ -157,6 +157,56 @@ public class DocumentChunkRepository {
     }
 
     /**
+     * Busca fragmentos por coincidencia literal de palabras clave.
+     *
+     * <p>Se usa {@code plainto_tsquery} en vez de {@code to_tsquery} a proposito:
+     * {@code plainto_tsquery} trata la entrada como texto y nunca interpreta
+     * operadores, de modo que una consulta con sintaxis tsquery malformada no
+     * rompe la busqueda.
+     *
+     * @return fragmentos ordenados por posicion, no por relevancia, porque la
+     *         relevance la decide el agente sobre el texto
+     */
+    public List<KeywordMatch> buscarPorPalabraClave(String query, int limite) {
+        return jdbcTemplate.query("""
+                SELECT f.texto, f.indice, d.id AS documento_id, d.nombre
+                FROM fragmentos_documento f
+                JOIN documentos d ON d.id = f.documento_id
+                WHERE to_tsvector('spanish', f.texto)
+                      @@ plainto_tsquery('spanish', ?)
+                ORDER BY d.id, f.indice
+                LIMIT ?
+                """, (rs, rowNum) -> new KeywordMatch(
+                rs.getString("texto"),
+                rs.getInt("indice"),
+                rs.getLong("documento_id"),
+                rs.getString("nombre")),
+                query, Math.max(1, limite));
+    }
+
+    /**
+     * Texto completo de un documento.
+     */
+    public Optional<String> textoDeDocumento(long documentoId) {
+        List<String> textos = jdbcTemplate.queryForList(
+                "SELECT contenido_texto FROM documentos WHERE id = ?", String.class, documentoId);
+        return textos.stream().findFirst();
+    }
+
+    /**
+     * Fragmentos de un documento, en orden.
+     */
+    public List<FragmentoTexto> fragmentosDe(long documentoId, Integer desdeIndice, int limite) {
+        return jdbcTemplate.query("""
+                SELECT indice, texto FROM fragmentos_documento
+                WHERE documento_id = ? AND (? IS NULL OR indice >= ?)
+                ORDER BY indice
+                LIMIT ?
+                """, (rs, rowNum) -> new FragmentoTexto(rs.getInt("indice"), rs.getString("texto")),
+                documentoId, desdeIndice, desdeIndice, Math.max(1, limite));
+    }
+
+    /**
      * Convierte un vector de floats a la notacion literal de pgvector.
      */
     public static String toVectorLiteral(float[] embedding) {
@@ -170,6 +220,18 @@ public class DocumentChunkRepository {
         }
         sb.append(']');
         return sb.toString();
+    }
+
+    /**
+     * Fragmento recuperado por palabras clave.
+     */
+    public record KeywordMatch(String texto, int indice, long documentoId, String nombre) {
+    }
+
+    /**
+     * Fragmento con su indice, sin metadatos de documento.
+     */
+    public record FragmentoTexto(int indice, String texto) {
     }
 
     /**

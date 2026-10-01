@@ -12,8 +12,12 @@ public class SearchProperties {
 
     /**
      * URL base de SearXNG.
+     *
+     * <p>El default coincide con el puerto publicado en {@code docker-compose.yml}.
+     * Antes pointed to 8081, que es el backend: si la propiedad se olvidara, el
+     * agente se habria haciendo peticiones a si mismo en bucle.
      */
-    private String baseUrl = "http://localhost:8081";
+    private String baseUrl = "http://localhost:8090";
 
     /**
      * Tiempo maximo de espera por consulta.

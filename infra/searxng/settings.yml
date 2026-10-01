@@ -11,6 +11,9 @@ search:
   default_lang: "es"
   formats:
     - html
+    # El backend pide format=json en SearchWebTool. Sin esta linea SearXNG
+    # ignora el parametro y devuelve HTML, que la tool no puede parsear.
+    - json
   safe_search: 1
   autocomplete: ""
 

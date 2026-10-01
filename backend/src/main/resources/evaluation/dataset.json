@@ -1,0 +1,68 @@
+{
+  "casos": [
+    {
+      "id": "EV-001",
+      "nombre": "Contraseña del dataset demo",
+      "pregunta": "¿Qué usuario de base de datos puede escribir en el dataset de demostración y cuál solo puede leer?",
+      "criteriosEsperados": [
+        "research_ro",
+        "solo lectura",
+        "GRANT SELECT"
+      ],
+      "presupuestoTokens": 120000,
+      "maxRondas": 2,
+      "notas": "La respuesta está en la migración V2 y en la configuración del pool de solo lectura. Es un caso de comprobación de que el agente cita el esquema y no inventa."
+    },
+    {
+      "id": "EV-002",
+      "nombre": "Fragmentación con solape",
+      "pregunta": "¿Cómo se fragmentan los documentos antes de indexarlos y por qué se mantiene solape entre fragmentos?",
+      "criteriosEsperados": [
+        "800",
+        "solape",
+        "verificación"
+      ],
+      "presupuestoTokens": 120000,
+      "maxRondas": 2,
+      "notas": "Documentado en TextChunker y en AGENTS.md. Comprueba la lectura del código propio."
+    },
+    {
+      "id": "EV-003",
+      "nombre": "Estado terminal vs interrumpida",
+      "pregunta": "¿En qué estados puede quedar una investigación y cuáles de ellos se pueden reanudar?",
+      "criteriosEsperados": [
+        "INTERRUPTED",
+        "COMPLETED",
+        "reanudar"
+      ],
+      "presupuestoTokens": 120000,
+      "maxRondas": 2,
+      "notas": "El caso distingue terminal de reanudable, que es la sutileza de la máquina de estados."
+    },
+    {
+      "id": "EV-004",
+      "nombre": "Protección SSRF",
+      "pregunta": "¿Qué comprobaciones hace el sistema antes de descargar una página web y por qué no basta validar el esquema?",
+      "criteriosEsperados": [
+        "DNS",
+        "resolución",
+        "interna"
+      ],
+      "presupuestoTokens": 140000,
+      "maxRondas": 2,
+      "notas": "Requiere explicar el bypass de resolución mixta. Es un caso de razonamiento sobre el código, no de memoria."
+    },
+    {
+      "id": "EV-005",
+      "nombre": "Informe sin evidencia",
+      "pregunta": "¿Qué ocurre si una investigación termina sin ninguna evidencia verificada?",
+      "criteriosEsperados": [
+        "advertencia",
+        "sin resultados"
+      ],
+      "presupuestoTokens": 100000,
+      "maxRondas": 2,
+      "notas": "Comprueba que el sistema declara el vacío en vez de rellenarlo. El criterio es deliberadamente amplio porque la redacción exacta no importa."
+    }
+  ]
+}

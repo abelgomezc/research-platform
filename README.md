@@ -6,10 +6,15 @@ y produce un informe donde **cada afirmacion cita su evidencia verificada**.
 No es un chatbot. Es un flujo de trabajo con maquina de estados explicita,
 agentes con roles, herramientas registradas, presupuestos y verificacion.
 
-> **Estado: FASES 1 y 2 completadas.** Base del proyecto, wrapper del LLM con conteo de
-> tokens y reintentos, esquema PostgreSQL + pgvector, health checks, CI, puerto de
-> conocimiento con dos implementaciones y corpus de demostracion. Las fases siguientes
-> anaden el flujo de investigacion.
+> **Estado: FASES 1 a 10 completadas, 199 tests en verde.** El flujo completo esta
+> implementado: maquina de estados, plan, agente investigador con tools, verificacion
+> en dos capas, sintesis del informe, Reviewer, checkpoints, cancelacion, stream SSE,
+> frontend React, dataset de evaluacion y metricas.
+>
+> **La Fase 11 no esta hecha y no se puede cerrar sin ejecutar el sistema**: no hay
+> ninguna cifra real de calidad de informe, coste por investigacion ni tasa de
+> verificacion. La seccion *Resultados* mas abajo lo dice explicitamente en lugar de
+> inventar numeros. Para cerrarla hace falta levantar Docker y correr el dataset.
 
 ## Arquitectura
 
@@ -202,6 +207,67 @@ Para que ambos proyectos convivan en la misma máquina:
 | PostgreSQL (host) | 5433 | 5432 |
 | SearXNG (host) | 8090 | — |
 | Ollama | 11434 (compartido) | 11434 (compartido) |
+
+## API de investigaciones
+
+| Endpoint | Que hace |
+|---|---|
+| `POST /api/research` | Crea una investigacion y la lanza en segundo plano. Responde `202` con el id. |
+| `GET /api/research` | Listado paginado. |
+| `GET /api/research/{id}` | Detalle: estado, ronda, presupuesto y resumen de verificacion. |
+| `GET /api/research/{id}/stream` | Stream SSE del progreso. Acepta `Last-Event-ID`. |
+| `GET /api/research/{id}/events` | Eventos discretos, sin abrir stream. |
+| `POST /api/research/{id}/cancel` | Cancela. Cooperativo: responde `202`. |
+| `POST /api/research/{id}/checkpoint` | Guarda el estado actual. |
+| `POST /api/research/{id}/resume` | Reanuda una investigacion interrumpida. |
+| `GET /api/research/{id}/report` | Ultimo informe, o `?historico=true` para todas las versiones. |
+| `GET /api/research/{id}/metrics` | Metricas calculadas de lo que ocurrio. |
+| `GET /api/evaluation/summary` | Comparativa entre investigaciones. |
+| `POST /api/evaluation/run` | Ejecuta el dataset. Lento: cada caso es una investigacion completa. |
+
+La ejecucion es asincrona a proposito. Una investigacion consume minutos y varias
+llamadas al modelo; si la peticion HTTP esperara, un corte de red perderia el
+trabajo. Se devuelve un id y el progreso se sigue por SSE.
+
+El stream usa `EventSource` en el navegador porque reconecta solo y reenvia
+`Last-Event-ID`. Los eventos estan persistidos en `eventos_investigacion`, asi que
+un corte de red no pierde progreso: se reenvia lo que se emitio mientras el
+cliente no estaba.
+
+## Resultados
+
+**No hay cifras de calidad todavia.** No se han ejecutado investigaciones reales
+contra este backend, y por tanto no existe ninguna medida de:
+
+- cobertura de criterios del dataset de evaluacion,
+- tasa de citas verificadas por informe,
+- tokens consumidos por investigacion,
+- distribucion de uso y fallos por herramienta.
+
+Cualquier numero en este documento seria inventado. Los que faltan se obtienen
+asi:
+
+```bash
+# 1. Levantar la infraestructura y el backend
+docker compose up -d --build
+
+# 2. Ejecutar el dataset de evaluacion (5 casos, cada uno una investigacion)
+curl -X POST "http://localhost:8081/api/evaluation/run" \
+     -H "Content-Type: application/json"
+
+# 3. Comparativa de lo obtenido
+curl "http://localhost:8081/api/evaluation/summary"
+```
+
+El dataset esta en `backend/src/main/resources/evaluation/dataset.json` y cada
+caso declara las afirmaciones que el informe debe cubrir. La puntuacion es
+cobertura de esos criterios, no parecido textual: dos redacciones del mismo hecho
+son ambas correctas.
+
+**Lo que si esta medido:** 199 tests unitarios en verde, incluidos los que
+comprueban los guards de seguridad, la maquina de estados, el presupuesto, el
+protocolo de tool calling, las dos capas de verificacion y las reglas de citacion
+del informe.
 
 ## Documentacion
 
