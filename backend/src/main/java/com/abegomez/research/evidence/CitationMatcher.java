@@ -3,6 +3,8 @@ package com.abegomez.research.evidence;
 import java.text.Normalizer;
 import java.util.Locale;
 
+import org.springframework.stereotype.Component;
+
 /**
  * Comprobacion determinista de que una cita aparece en su fuente.
  *
@@ -21,6 +23,7 @@ import java.util.Locale;
  * cita casi correcta pase por buena. Se prefiere un falso positivo sobre perder
  * citas validas por un acento.
  */
+@Component
 public final class CitationMatcher {
 
     /**
@@ -41,7 +44,7 @@ public final class CitationMatcher {
     /** Longitud minima de la cita para que la coincidencia sea significativa. */
     private static final int LONGITUD_MINIMA = 15;
 
-    private CitationMatcher() {
+    public CitationMatcher() {
     }
 
     /**

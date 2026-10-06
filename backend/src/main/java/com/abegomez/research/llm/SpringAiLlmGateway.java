@@ -3,6 +3,10 @@ package com.abegomez.research.llm;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.abegomez.research.common.ErrorCode;
 import com.abegomez.research.common.exception.BusinessException;
@@ -15,6 +19,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,6 +40,7 @@ public class SpringAiLlmGateway implements LlmGateway {
     private final LlmMetrics metrics;
     private final Sleeper sleeper;
 
+    @Autowired
     public SpringAiLlmGateway(LlmModelRegistry modelRegistry, LlmProperties properties, LlmMetrics metrics) {
         this(modelRegistry, properties, metrics, Thread::sleep);
     }
@@ -97,7 +103,29 @@ public class SpringAiLlmGateway implements LlmGateway {
             throw new IllegalStateException("No hay modelo configurado para el rol " + role);
         }
 
-        ChatResponse response = chatModel.call(new Prompt(buildMessages(messages), optionsFor(role, model)));
+        Prompt prompt = new Prompt(buildMessages(messages), optionsFor(role, model));
+        int timeoutSeconds = properties.getTimeoutSeconds();
+
+        CompletableFuture<ChatResponse> future = CompletableFuture.supplyAsync(() -> chatModel.call(prompt));
+        ChatResponse response;
+        try {
+            response = future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            log.warn("Timeout de {}s excedido para rol={}, modelo={}, intento={}",
+                    timeoutSeconds, role, model, attempt);
+            throw new LlmCallException(
+                    "Timeout de " + timeoutSeconds + "s excedido para el rol " + role
+                            + " con modelo " + model, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmCallException(
+                    "La llamada al modelo fue interrumpida para el rol " + role, e);
+        } catch (ExecutionException e) {
+            throw new LlmCallException(
+                    "Error en la llamada al modelo para el rol " + role, e.getCause());
+        }
+
         String content = requireContent(response, model);
         TokenCounting counting = countTokens(response, messages, content);
         long durationMs = (System.nanoTime() - startedAt) / 1_000_000L;

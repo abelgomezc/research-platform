@@ -80,7 +80,6 @@ public class ResearchAgent {
             }
 
             pasos++;
-            tokensConsumidos += maxTokensPaso;
 
             LlmResult respuesta;
             try {
@@ -93,7 +92,11 @@ public class ResearchAgent {
                         "El modelo fallo: " + ex.getMessage());
             }
 
+            tokensConsumidos += respuesta.totalTokens();
+
             ToolCall llamada = ToolCall.parse(respuesta.content(), objectMapper);
+
+            log.debug("LLM respuesta raw (pasos={}): {}", pasos, respuesta.content());
 
             if (!llamada.valido()) {
                 // Se devuelve el error al modelo en vez de terminar: puede

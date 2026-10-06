@@ -53,6 +53,7 @@ public class LlmModelRegistry {
                             .model(properties.modelFor(role))
                             .temperature(params.temperature())
                             .numPredict(params.maxTokens())
+                            .numCtx(8192)
                             .build())
                 .build();
     }

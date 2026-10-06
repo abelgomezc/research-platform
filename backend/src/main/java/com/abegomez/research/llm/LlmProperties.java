@@ -3,6 +3,7 @@ package com.abegomez.research.llm;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
@@ -11,6 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * <p>Los modelos se configuran por rol de agente para poder cambiarlos sin tocar
  * codigo. Los nombres de propiedad usan kebab-case y los roles en minusculas.
  */
+    @Component
 @ConfigurationProperties(prefix = "app.llm")
 public class LlmProperties {
 
@@ -33,6 +35,16 @@ public class LlmProperties {
      * Parametros por rol (temperatura, tokens maximos, contexto).
      */
     private Params params = new Params();
+
+    private int timeoutSeconds = 300;
+
+    public int getTimeoutSeconds() {
+        return timeoutSeconds;
+    }
+
+    public void setTimeoutSeconds(int timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
+    }
 
     public Models getModels() {
         return models;

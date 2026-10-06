@@ -11,6 +11,10 @@ public class LlmCallException extends BusinessException {
 
     private final int attempts;
 
+    public LlmCallException(String message, Throwable cause) {
+        this(message, cause, 1);
+    }
+
     public LlmCallException(String message, Throwable cause, int attempts) {
         super(ErrorCode.LLM_ERROR, message, cause);
         this.attempts = attempts;

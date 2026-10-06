@@ -46,9 +46,10 @@ public class TaskRepository {
      * tareas mas prioritarias deben ejecutarse primero aunque se hayan creado
      * despues.
      */
-    public Optional<TaskRow> siguientePendiente(long investigacionId, int ronda) {        List<TaskRow> tareas = jdbcTemplate.query("""
+    public Optional<TaskRow> siguientePendiente(long investigacionId, int ronda) {
+        List<TaskRow> tareas = jdbcTemplate.query("""
                 SELECT id, descripcion, tipo_fuente, prioridad, estado, ronda,
-                       intentos, COALESCE(resumen_resultado, '')
+                       intentos, COALESCE(resumen_resultado, '') AS resumen_resultado
                 FROM tareas_investigacion
                 WHERE investigacion_id = ? AND ronda = ? AND estado = 'PENDIENTE'
                 ORDER BY prioridad DESC, id
@@ -60,7 +61,7 @@ public class TaskRepository {
     public Optional<TaskRow> find(long tareaId) {
         List<TaskRow> tareas = jdbcTemplate.query("""
                 SELECT id, descripcion, tipo_fuente, prioridad, estado, ronda,
-                       intentos, COALESCE(resumen_resultado, '')
+                       intentos, COALESCE(resumen_resultado, '') AS resumen_resultado
                 FROM tareas_investigacion
                 WHERE id = ?
                 """, (rs, rowNum) -> leer(rs), tareaId);
@@ -70,7 +71,7 @@ public class TaskRepository {
     public List<TaskRow> porInvestigacion(long investigacionId) {
         return jdbcTemplate.query("""
                 SELECT id, descripcion, tipo_fuente, prioridad, estado, ronda,
-                       intentos, COALESCE(resumen_resultado, '')
+                       intentos, COALESCE(resumen_resultado, '') AS resumen_resultado
                 FROM tareas_investigacion
                 WHERE investigacion_id = ?
                 ORDER BY ronda, prioridad DESC, id

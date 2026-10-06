@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -58,6 +59,7 @@ public class ToolExecutor {
     private final ExecutorService executor;
     private final Sleeper sleeper;
 
+    @Autowired
     public ToolExecutor(ToolRegistry registry,
                         ToolExecutionLogRepository logRepository,
                         ToolMetrics metrics,

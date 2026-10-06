@@ -5,6 +5,7 @@ server:
   limiter: false
   image_proxy: false
   bind_address: "0.0.0.0"
+  secret_key: "research-platform-local-secret"
 
 search:
   # Motor por defecto. Sin API keys.

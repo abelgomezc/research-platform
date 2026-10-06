@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.List;
 
 import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ public class OllamaHealthIndicator implements HealthIndicator {
     private final OllamaApi ollamaApi;
     private final List<String> requiredModels;
 
+    @Autowired
     public OllamaHealthIndicator(OllamaApi ollamaApi,
                                  com.abegomez.research.llm.LlmProperties properties) {
         this(ollamaApi, java.util.Arrays.stream(com.abegomez.research.llm.AgentRole.values())

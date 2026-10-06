@@ -28,10 +28,10 @@ public class DocumentChunkRepository {
      * de modo que reprocesar el mismo contenido no duplique nada.
      */
     public long saveDocument(String nombre, String tipo, String contenido, String hash) {
-        Long existing = jdbcTemplate.queryForObject(
-                "SELECT id FROM documentos WHERE hash = ?", Long.class, hash);
-        if (existing != null) {
-            return existing;
+        List<Long> existing = jdbcTemplate.query(
+                "SELECT id FROM documentos WHERE hash = ?", (rs, rowNum) -> rs.getLong("id"), hash);
+        if (!existing.isEmpty()) {
+            return existing.get(0);
         }
 
         return jdbcTemplate.queryForObject(

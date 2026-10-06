@@ -89,6 +89,7 @@ services:
       SEARXNG_URL: http://searxng:8080
       API_TOKEN: ${API_TOKEN:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5174}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
       KNOWLEDGE_PROVIDER: ${KNOWLEDGE_PROVIDER:-pgvector}
       LOCALRAG_URL: ${LOCALRAG_URL:-http://host.docker.internal:8080}
       LLM_MODEL_PLANNER: ${LLM_MODEL_PLANNER:-qwen3:8b}

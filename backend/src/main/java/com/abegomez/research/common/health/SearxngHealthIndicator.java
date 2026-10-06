@@ -7,6 +7,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 import com.abegomez.research.common.config.SearchProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ public class SearxngHealthIndicator implements HealthIndicator {
     private final SearchProperties properties;
     private final HttpClient httpClient;
 
+    @Autowired
     public SearxngHealthIndicator(SearchProperties properties) {
         this(properties, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))

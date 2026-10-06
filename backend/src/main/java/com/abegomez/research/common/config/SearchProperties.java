@@ -4,9 +4,12 @@ import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import org.springframework.stereotype.Component;
+
 /**
  * Configuracion del metabuscador local usado por la tool de busqueda web.
  */
+@Component
 @ConfigurationProperties(prefix = "app.search")
 public class SearchProperties {
 
