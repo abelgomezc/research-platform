@@ -12,6 +12,10 @@ cd /d "%~dp0"
 set "MODELOS=qwen3:8b nomic-embed-text"
 
 echo.
+echo ==^> Deteniendo instancia previa (si existe)
+call detener-local.bat
+
+echo.
 echo ==^> Preparando configuracion
 docker version >nul 2>&1
 if errorlevel 1 (
@@ -32,23 +36,40 @@ if not exist ".env" (
     echo     .env ya existe, se respeta
 )
 
+REM Cargar variables de .env para usar en este script (cmd no las lee automaticamente)
+for /f "usebackq tokens=*" %%A in (`type .env ^| findstr /R "^[^#]"`) do (
+    set "linea=%%A"
+    if not "!linea!"=="" set !linea!
+)
+
 echo.
 echo ==^> Verificando modelos de Ollama
 REM Si Ollama corre como servicio del compose se usa el puerto del host.
 for %%M in (%MODELOS%) do (
-    curl -sf "http://localhost:11434/api/tags" | findstr /C:"\"%%M\"" >nul
+    curl.exe -sf "http://localhost:11434/api/tags" -o tags.tmp
+    findstr "%%M" tags.tmp >nul
     if errorlevel 1 (
         echo     Descargando %%M ^(puede tardar varios minutos^)
-        ollama pull %%M
+        ollama pull %%M >nul 2>&1
     ) else (
         echo     %%M ya esta descargado
     )
+    del tags.tmp >nul 2>&1
 )
 
 echo.
 echo ==^> Construyendo imagenes
-docker compose build
-if errorlevel 1 exit /b 1
+REM Se suprime la salida de build: los codigos ANSI de Docker corrompen
+REM el estado de la consola y rompen los redirects de curl posteriormente.
+docker compose build >build.log 2>&1
+if errorlevel 1 (
+    type build.log
+    echo.
+    echo     Error construyendo las imagenes.
+    exit /b 1
+)
+del build.log >nul 2>&1
+echo     Imagenes construidas
 
 echo.
 echo ==^> Levantando servicios
@@ -60,27 +81,25 @@ if errorlevel 1 exit /b 1
 
 echo.
 echo ==^> Esperando a que el backend este listo
-for /l %%I in (1,1,60) do (
-    curl -sf "http://localhost:8081/actuator/health" >nul 2>&1
-    if not errorlevel 1 (
-        echo     Backend respondiendo
-        goto :listo
-    )
-    timeout /t 5 /nobreak >nul
+REM El health check se ejecuta en PowerShell (health-check.ps1) porque los
+REM codigos ANSI que Docker escribe en la consola corrompen los redirects
+REM de cmd, produciendo errores de redireccion.
+powershell -NoProfile -ExecutionPolicy Bypass -File health-check.ps1 %BACKEND_PORT%
+if errorlevel 1 (
+    echo     El backend no respondio tras 5 minutos.
+    echo     Revisa los logs con: docker compose logs backend
+    exit /b 1
 )
-echo     El backend no respondio tras 5 minutos.
-echo     Revisa los logs con: docker compose logs backend
-exit /b 1
 
 :listo
 echo.
 echo ==^> Estado
-curl -s "http://localhost:8081/actuator/health"
+curl.exe -s "http://localhost:%BACKEND_PORT%/actuator/health"
 echo.
 echo.
-echo   Frontend:  http://localhost:5174
-echo   API:       http://localhost:8081
-echo   OpenAPI:   http://localhost:8081/swagger-ui.html
-echo   Health:    http://localhost:8081/actuator/health
+echo   Frontend:  http://localhost:%FRONTEND_PORT%
+echo   API:       http://localhost:%BACKEND_PORT%
+echo   OpenAPI:   http://localhost:%BACKEND_PORT%/swagger-ui.html
+echo   Health:    http://localhost:%BACKEND_PORT%/actuator/health
 echo.
 endlocal

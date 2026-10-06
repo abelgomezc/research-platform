@@ -104,7 +104,10 @@ export default function DetalleInvestigacion({ id, onVolver }: Props) {
   if (!detalle) {
     return (
       <div className="app">
-        <p className="vacio">{error ?? 'Cargando investigacion...'}</p>
+        <p className="vacio">
+          <span className="spinner" />
+          Cargando investigacion...
+        </p>
         <button className="boton" onClick={onVolver}>
           Volver
         </button>
@@ -220,7 +223,7 @@ export default function DetalleInvestigacion({ id, onVolver }: Props) {
 
         <section className="panel">
           <h2>Progreso</h2>
-          <ListaEventos eventos={eventos} />
+          <ListaEventos eventos={eventos} conectado={conectado} />
         </section>
       </main>
     </div>

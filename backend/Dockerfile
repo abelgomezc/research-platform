@@ -10,7 +10,7 @@ WORKDIR /build
 COPY --from=deps /root/.m2 /root/.m2
 COPY pom.xml .
 COPY src ./src
-RUN mvn -B -DskipTests package
+RUN mvn -B -DskipTests clean package
 
 # Etapa 3: ejecucion minima sin herramientas de build
 FROM eclipse-temurin:21-jre-jammy AS runtime
@@ -23,11 +23,11 @@ COPY --from=build /build/target/research-platform-backend-*.jar app.jar
 RUN chown app:app /app/app.jar
 USER app
 
-EXPOSE 8080
+EXPOSE 8081
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseZGC"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
-    CMD ["sh", "-c", "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"]
+    CMD ["sh", "-c", "wget -qO- http://localhost:${SERVER_PORT:-8081}/actuator/health/liveness || exit 1"]
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

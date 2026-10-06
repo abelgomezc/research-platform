@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import type { ResearchListItem } from './types';
+import { estaActiva } from './types';
 import DetalleInvestigacion from './components/DetalleInvestigacion';
 
 export default function App() {
@@ -110,7 +111,8 @@ export default function App() {
           </div>
 
           <button className="boton boton-primario" onClick={crear} disabled={cargando}>
-            {cargando ? 'Iniciando...' : 'Iniciar investigacion'}
+            {cargando && <span className="spinner" />}
+            {cargando ? 'Creando...' : 'Iniciar investigacion'}
           </button>
 
           {error && <p className="error">{error}</p>}
@@ -139,6 +141,24 @@ export default function App() {
                       {investigacion.presupuestoTokens.toLocaleString('es')} tokens
                     </span>
                   </button>
+                  {estaActiva(investigacion.estado) && (
+                    <button
+                      className="boton boton-peligro boton-cancelar-lista"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!confirm('¿Estas seguro de cancelar esta investigacion?')) return;
+                        try {
+                          await api.cancelar(investigacion.id);
+                          await refrescar();
+                        } catch (excepcion) {
+                          setError(excepcion instanceof Error ? excepcion.message : 'No se pudo cancelar');
+                        }
+                      }}
+                      title="Cancelar investigacion"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

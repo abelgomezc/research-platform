@@ -2,6 +2,7 @@ import type { ResearchEvent } from '../types';
 
 interface Props {
   eventos: ResearchEvent[];
+  conectado?: boolean;
 }
 
 /**
@@ -68,11 +69,15 @@ function describir(evento: ResearchEvent): string {
 /** Eventos que son ruido visual y no se muestran. */
 const RUIDO = new Set(['EVIDENCE_SAVED']);
 
-export default function ListaEventos({ eventos }: Props) {
+export default function ListaEventos({ eventos, conectado = true }: Props) {
   const visibles = [...eventos].reverse().filter((e) => !RUIDO.has(e.tipo));
 
   if (visibles.length === 0) {
-    return <p className="vacio">Sin eventos todavia.</p>;
+    return (
+      <p className="vacio">
+        {conectado ? 'Conectando al stream...' : 'Sin eventos todavia.'}
+      </p>
+    );
   }
 
   return (

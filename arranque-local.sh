@@ -20,6 +20,11 @@ command -v docker >/dev/null 2>&1 || fail "Docker no esta instalado"
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 no esta disponible"
 
 # ---------------------------------------------------------------------
+log "Deteniendo instancia previa (si existe)"
+# ---------------------------------------------------------------------
+./detener-local.sh || true
+
+# ---------------------------------------------------------------------
 log "Preparando configuracion"
 # ---------------------------------------------------------------------
 if [ ! -f .env ]; then
@@ -28,6 +33,11 @@ if [ ! -f .env ]; then
 else
     ok ".env ya existe, se respeta"
 fi
+
+# Cargar variables de .env para usar en este script
+set -a
+source .env
+set +a
 
 # ---------------------------------------------------------------------
 log "Descargando modelos de Ollama"
@@ -40,7 +50,7 @@ else
 fi
 
 for modelo in "${MODELOS[@]}"; do
-    if curl -sf "$OLLAMA_URL/api/tags" | grep -q "\"$modelo\""; then
+    if curl -sf "$OLLAMA_URL/api/tags" | grep -q "$modelo"; then
         ok "$modelo ya esta descargado"
     else
         ok "Descargando $modelo (puede tardar varios minutos)"
@@ -66,7 +76,7 @@ docker compose up -d
 log "Esperando a que el backend este listo"
 # ---------------------------------------------------------------------
 for intento in $(seq 1 60); do
-    if curl -sf "http://localhost:${BACKEND_PORT:-8081}/actuator/health" >/dev/null 2>&1; then
+    if curl -sf "http://localhost:${BACKEND_PORT:-8082}/actuator/health" >/dev/null 2>&1; then
         ok "Backend respondiendo"
         break
     fi
@@ -79,11 +89,11 @@ done
 # ---------------------------------------------------------------------
 log "Estado"
 # ---------------------------------------------------------------------
-curl -s "http://localhost:${BACKEND_PORT:-8081}/actuator/health" | head -c 400
+curl -s "http://localhost:${BACKEND_PORT:-8082}/actuator/health" | head -c 400
 echo
 echo
-echo "  Frontend:  http://localhost:${FRONTEND_PORT:-5174}"
-echo "  API:       http://localhost:${BACKEND_PORT:-8081}"
-echo "  OpenAPI:   http://localhost:${BACKEND_PORT:-8081}/swagger-ui.html"
-echo "  Health:    http://localhost:${BACKEND_PORT:-8081}/actuator/health"
+echo "  Frontend:  http://localhost:${FRONTEND_PORT:-5175}"
+echo "  API:       http://localhost:${BACKEND_PORT:-8082}"
+echo "  OpenAPI:   http://localhost:${BACKEND_PORT:-8082}/swagger-ui.html"
+echo "  Health:    http://localhost:${BACKEND_PORT:-8082}/actuator/health"
 echo
