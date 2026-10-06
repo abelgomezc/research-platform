@@ -47,7 +47,6 @@ export default function DetalleInvestigacion({ id, onVolver }: Props) {
 
   useEffect(() => {
     void cargarDetalle();
-    void cargarInforme();
 
     const fuente = abrirStream(
       id,
@@ -67,9 +66,6 @@ export default function DetalleInvestigacion({ id, onVolver }: Props) {
     fuenteRef.current = fuente;
     setConectado(true);
 
-    // Sondeo suave: el estado y el informe se actualizan por evento, pero el
-    // detalle tambien depende de cosas que no generan evento, como el consumo
-    // de tokens.
     const intervalo = setInterval(() => {
       void cargarDetalle();
     }, 5000);
@@ -80,6 +76,12 @@ export default function DetalleInvestigacion({ id, onVolver }: Props) {
       fuenteRef.current = null;
     };
   }, [id, cargarDetalle, cargarInforme]);
+
+  useEffect(() => {
+    if (detalle && !estaActiva(detalle.estado) && !informe) {
+      void cargarInforme();
+    }
+  }, [detalle, informe, cargarInforme]);
 
   async function cancelar() {
     try {
